@@ -11,7 +11,7 @@ public class Book {
     private BigDecimal price;
 
     public Book(String title, String author, String price) {
-        this(title, author, new BigDecimal(price));
+        this(title, author, price.isEmpty() ? BigDecimal.ZERO : new BigDecimal(price));
     }
 
     public Book(String title, String author, BigDecimal price) {

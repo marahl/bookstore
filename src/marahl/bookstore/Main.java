@@ -13,19 +13,19 @@ import java.util.*;
 public class Main {
     private static final String defaultURL = "https://raw.githubusercontent.com/contribe/contribe/dev/bookstoredata/bookstoredata.txt";
 
-    private static final String ADD = "add";
-    private static final String REMOVE = "remove";
+    private static final String ADD_CART = "add";
+    private static final String REMOVE_CART = "remove";
+    private static final String CART = "cart";
     private static final String ADD_STOCK = "addstock";
     private static final String REMOVE_STOCK = "remstock";
     private static final String FIND = "find";
     private static final String LIST = "list";
-    private static final String CART = "cart";
     private static final String BUY = "buy";
     private static final String EXIT = "exit";
     private static final String HELP = "help";
     private static final LinkedHashMap<String, String> commandHelp = new LinkedHashMap<>();
 
-    private static BookStock stock;
+    private static BookCart shoppingCart = new BookCart();
     private static BookStore store;
     private static LinkedList<String> messages = new LinkedList<>();
 
@@ -35,15 +35,14 @@ public class Main {
         if (args.length > 0) {
             storeUrl = args[0];
         }
+        store = new BookStore();
         try {
-            stock = new BookStock();
-            if (!updateStock(stock, new URL(storeUrl))) {
+            if (!updateStore(new URL(storeUrl))) {
                 System.out.println("Error while trying to load books from the URL: " + storeUrl + "\nContinuing with an empty stock");
             }
         } catch (MalformedURLException e) {
-            System.out.println(defaultURL + " is no valid URL. BookStock will remain empty");
+            System.out.println(defaultURL + " is no valid URL. BookCart will remain empty");
         }
-        store = new BookStore(stock);
 
         storeLoop();
     }
@@ -61,7 +60,7 @@ public class Main {
         }
     }
 
-    private static boolean updateStock(BookStock stock, URL storeURL) {
+    private static boolean updateStore(URL storeURL) {
         if (storeURL != null) {
             String stockString = "";
             try (Scanner sc = new Scanner(storeURL.openStream())) {
@@ -72,19 +71,19 @@ public class Main {
                 e.printStackTrace();
                 return false;
             }
-            return stock.parseAndAddBatch(stockString);
+            return store.parseAndAddBatch(stockString);
         } else {
             return false;
         }
     }
 
     private static void initCommandHelpStrings() {
-        commandHelp.put(ADD, "[id;(quantity)] Add a book to your cart");
-        commandHelp.put(REMOVE, "[cartindex] Remove a book from your cart");
-        commandHelp.put(ADD_STOCK, "[title;author;price;quantity] Add a book to the store's stock");
+        commandHelp.put(ADD_CART, "[id;(quantity)] Add a book to your cart");
+        commandHelp.put(REMOVE_CART, "[cartindex] Remove a book from your cart");
+        commandHelp.put(ADD_STOCK, "[title;author;price;quantity] Add a new book to the store's stock");
         commandHelp.put(REMOVE_STOCK, "[id] Remove a book from the store's stock");
-        commandHelp.put(FIND, "[title or author] List all books with that title or by that author");
-        commandHelp.put(LIST, "Lists all books currently in stock");
+        commandHelp.put(LIST, "[(searchstring)] List all books with that title or by that author\n" +
+                "\t\t\tLists everything if no searchstring is specified");
         commandHelp.put(CART, "Lists all books currently in your shopping cart");
         commandHelp.put(BUY, "Buy contents of your shopping chart");
         commandHelp.put(HELP, "List all available commands");
@@ -98,23 +97,21 @@ public class Main {
             args = stringarr[1].split(";");
         }
         switch (command) {
-            case ADD:
-                commandAdd(args);
+            case ADD_CART:
+                commandAddToCart(args);
                 break;
-            case REMOVE:
-                commandRemove(args);
+            case REMOVE_CART:
+                commandRemoveFromCart(args);
                 break;
             case ADD_STOCK:
-                commandAddStock(args);
+                commandAddToStock(args);
                 break;
             case REMOVE_STOCK:
-                commandRemoveStock(args);
+                commandRemoveFromStock(args);
                 break;
             case FIND:
-                commandFind(args);
-                break;
             case LIST:
-                commandList();
+                commandList(args);
                 break;
             case CART:
                 commandCart();
@@ -131,11 +128,11 @@ public class Main {
         }
     }
 
-    private static boolean commandAdd(String[] args) {
+    private static boolean commandAddToCart(String[] args) {
         if (hasArgument(args, 0)) {
             Integer bookId = getPositiveIntegerArgument(args, 0);
             if (bookId == null) return false;
-            Book book = stock.getBook(bookId);
+            Book book = store.getBook(bookId);
             if (book == null) {
                 messages.add(String.format("Couldn't find any book with the id %s", args[0]));
                 return false;
@@ -145,7 +142,7 @@ public class Main {
                 quantity = getPositiveIntegerArgument(args, 1);
                 if (quantity == null) return false;
             }
-            boolean b = store.add(book, quantity);
+            boolean b = shoppingCart.addToCart(book, quantity);
             if (b) {
                 messages.add(String.format("Successfully added %dx %s by %s to cart!", quantity, book.getTitle(), book.getAuthor()));
             } else {
@@ -157,15 +154,15 @@ public class Main {
         return false;
     }
 
-    private static Book commandRemove(String[] args) {
+    private static Book commandRemoveFromCart(String[] args) {
         if (hasArgument(args, 0)) {
             Integer cartIndex = getPositiveIntegerArgument(args, 0);
             if (cartIndex != null) {
                 try {
-                    Book book = store.removeFromCart(cartIndex);
+                    Book book = shoppingCart.removeFromCart(cartIndex);
                     messages.add(String.format("Successfully removed %s by %s from your cart", book.getTitle(), book.getAuthor()));
                     return book;
-                } catch (NumberFormatException ex) {
+                } catch (IndexOutOfBoundsException ex) {
                     messages.add(String.format("No book in cart on index %d", cartIndex));
                 }
             }
@@ -175,14 +172,17 @@ public class Main {
         return null;
     }
 
-    private static boolean commandAddStock(String[] args) {
+    private static boolean commandAddToStock(String[] args) {
         if (hasArgument(args, 3)) {
             String title = args[0];
             String author = args[1];
             BigDecimal price = getDecimalArgument(args, 2);
-            int quantity = getPositiveIntegerArgument(args, 3);
+            Integer quantity = getPositiveIntegerArgument(args, 3);
+            if (price == null || quantity == null) {
+                return false;
+            }
             Book book = new Book(title, author, price);
-            stock.addBook(book, quantity);
+            store.add(book, quantity);
             messages.add("Added a new book to the store:");
             messages.add(BookStore.getFormattedBookString(book, quantity));
             return true;
@@ -193,11 +193,11 @@ public class Main {
         return false;
     }
 
-    private static Pair<Book, Integer> commandRemoveStock(String[] args) {
+    private static Pair<Book, Integer> commandRemoveFromStock(String[] args) {
         if (hasArgument(args, 0)) {
             Integer bookId = getPositiveIntegerArgument(args, 0);
             if (bookId == null) return null;
-            Pair<Book, Integer> removedBook = stock.removeBook(bookId);
+            Pair<Book, Integer> removedBook = store.remove(bookId);
             if (removedBook != null) {
                 messages.add("Book from the store:");
                 messages.add(BookStore.getFormattedBookString(removedBook.getKey(), removedBook.getValue()));
@@ -212,7 +212,7 @@ public class Main {
     }
 
 
-    private static Book[] commandFind(String[] args) {
+    private static Book[] commandList(String[] args) {
         String searchString = "";
         if (hasArgument(args, 0)) {
             searchString = args[0];
@@ -221,30 +221,16 @@ public class Main {
         if (list.length > 0) {
             messages.add(getStockLegendString());
             for (Book book : list) {
-                messages.add(getStockBookString(book, stock.getQuantity(book)));
+                messages.add(getStockBookString(book, store.getQuantity(book)));
             }
         } else {
-            messages.add(String.format("Couldn't find anything matching \"%s\"...", searchString));
+            messages.add("Couldn't find anything");
         }
         return list;
     }
 
-    private static Book[] commandList() {
-        Book[] books = Main.stock.getStock();
-        if (books.length == 0) {
-            messages.add("There are no books in the store");
-        } else {
-            messages.add(getStockLegendString());
-            for (Book book : books) {
-                int quantity = Main.stock.getQuantity(book);
-                messages.add(getStockBookString(book, quantity));
-            }
-        }
-        return books;
-    }
-
     private static Book[] commandCart() {
-        Book[] cart = store.getCartContent();
+        Book[] cart = shoppingCart.getCartContent();
         if (cart.length == 0) {
             messages.add("There are no books in your cart");
         } else {
@@ -263,7 +249,7 @@ public class Main {
     }
 
     private static String getStockBookString(Book book, int quantity) {
-        return String.format("%8d %s", stock.getBookID(book), BookStore.getFormattedBookString(book, quantity));
+        return String.format("%8d %s", store.getBookID(book), BookStore.getFormattedBookString(book, quantity));
     }
 
     private static String getCartLegendString() {
@@ -275,9 +261,9 @@ public class Main {
     }
 
     private static BigDecimal commandBuy() {
-        Book[] books = store.getCartContent();
+        Book[] books = shoppingCart.getCartContent();
         int[] bookStatus = store.buy(books);
-        BigDecimal totalPrice = store.getTotalPrice(store.getCartContent(), bookStatus);
+        BigDecimal totalPrice = shoppingCart.buyFromStore(store);
         for (int i = 0; i < bookStatus.length; i++) {
             int status = bookStatus[i];
             Book book = books[i];
