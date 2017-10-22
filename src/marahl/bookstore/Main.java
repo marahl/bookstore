@@ -271,7 +271,7 @@ public class Main {
     }
 
     private static String getStockLegendString() {
-        return String.format("%8s %s", "ID", BookStore.getFormattedLegendStringWithQuantity());
+        return String.format("%8s %s", "ID", BookStore.getFormattedHeaderStringWithQuantity());
     }
 
     private static BigDecimal commandBuy() {

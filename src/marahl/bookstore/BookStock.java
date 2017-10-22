@@ -17,22 +17,6 @@ public class BookStock {
     private final Map<Integer, Integer> bookQuantity = new HashMap<>();
     private final Map<Book, Integer> bookIds = new LinkedHashMap<>();
 
-    public BookStock() {
-    }
-
-
-    /**
-     * Parses and adds the content of the string as initial stock
-     * Each row in the string should contain exactly one book
-     * Each book should be written as four values separated by ';'
-     * The values are in order: title;author;price;quantity
-     *
-     * @param initialStock string to parse as initial stock
-     */
-    public BookStock(String initialStock) {
-        parseAndAddBatch(initialStock);
-    }
-
 
     /**
      * Adds zero or more book to the stock and gives it an unique ID, if the book already exists
@@ -47,8 +31,8 @@ public class BookStock {
     public int addBook(Book newBook, int quantity) {
         if (newBook == null) throw new NullPointerException("Book can't be null");
         if (quantity < 0) throw new IllegalArgumentException("Quantity can't be negative");
+        int id;
         synchronized (stock) {
-            int id;
             if (bookIds.containsKey(newBook)) {
                 id = bookIds.get(newBook);
                 quantity += getQuantity(id);
@@ -58,8 +42,8 @@ public class BookStock {
             stock.put(id, newBook);
             bookQuantity.put(id, quantity);
             bookIds.put(newBook, id);
-            return id;
         }
+        return id;
     }
 
     /**
@@ -199,25 +183,27 @@ public class BookStock {
      */
     public boolean parseAndAddBatch(String stockString) {
         List<Book> books = new ArrayList<>();
-        List<Integer> bookQuantity = new ArrayList<>();
+        List<Integer> bookQuantities = new ArrayList<>();
         Scanner sc = new Scanner(stockString);
+        String line;
+        int lineNumber = 0;
         while (sc.hasNextLine()) {
-            String line = sc.nextLine();
+            line = sc.nextLine();
+            lineNumber++;
             if (line.isEmpty()) continue;
             try {
                 Pair<Book, Integer> bookValues = parseBook(line);
                 if (bookValues != null) {
-                    addBook(bookValues.getKey(), bookValues.getValue());
+                    books.add(bookValues.getKey());
+                    bookQuantities.add(bookValues.getValue());
                 }
             } catch (IndexOutOfBoundsException | NumberFormatException e) {
-                System.err.println("Format not supported\n" +
-                        "Should be: TITLE;AUTHOR;PRICE;QUANTITY (STRING;STRING;DOUBLE;INTEGER)");
-                e.printStackTrace();
+                System.out.println(String.format("Error while parsing on line %d: %s", lineNumber, line));
                 return false;
             }
         }
         Book[] bookArr = books.toArray(new Book[books.size()]);
-        int[] qtyArr = bookQuantity.stream().mapToInt(Integer::new).toArray();
+        int[] qtyArr = bookQuantities.stream().mapToInt(Integer::new).toArray();
         addBatch(bookArr, qtyArr);
         return true;
     }

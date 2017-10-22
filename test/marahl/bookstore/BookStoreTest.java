@@ -56,15 +56,6 @@ public class BookStoreTest {
     }
 
     @Test
-    public void getFormattedBookString() throws Exception {
-        Book book = testBooks[4].getKey();
-        int quantity = 6;
-        String expected = String.format("%24s%24s%16.2f%8d", book.getTitle(), book.getAuthor(), book.getPrice(), quantity);
-        String actual = BookStore.getFormattedBookString(book, quantity);
-        assertEquals(expected, actual);
-    }
-
-    @Test
     public void getCartContent() throws Exception {
         Book book = testBooks[1].getKey();
         store.add(book, 1);
@@ -121,13 +112,20 @@ public class BookStoreTest {
         for (Pair<Book, Integer> testBook : testBooks) {
             store.add(testBook.getKey(), 1);
         }
+        Book removedBook = stock.removeBook(4).getKey();
         int[] status = store.buy(store.getCartContent());
         assertEquals(testBooks.length, status.length);
 
         for (int i = 0; i < testBooks.length; i++) {
+            Book book = testBooks[i].getKey();
             int quantity = testBooks[i].getValue();
             int actual = status[i];
-            int expected = quantity > 0 ? BookStore.OK : BookStore.NOT_IN_STOCK;
+            int expected = -1;
+            if (book == removedBook) {
+                expected = BookStore.DOES_NOT_EXIST;
+            } else if (quantity <= 0) {
+                expected = BookStore.NOT_IN_STOCK;
+            } else if (quantity > 0) expected = BookStore.OK;
 
             assertEquals(expected, actual);
         }
@@ -157,4 +155,23 @@ public class BookStoreTest {
         assertEquals(0, buy.length);
     }
 
+    @Test
+    public void getFormattedBookString() throws Exception {
+        Book book = testBooks[4].getKey();
+        int quantity = 6;
+        String expected = String.format("%24s%24s%16.2f%8d", book.getTitle(), book.getAuthor(), book.getPrice(), quantity);
+        String actual = BookStore.getFormattedBookString(book, quantity);
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void getFormattedHeaderString() {
+        Book book = testBooks[0].getKey();
+        int headerStringLength = BookStore.getFormattedHeaderString().length();
+        int bookStringLength = BookStore.getFormattedBookString(book).length();
+        assertEquals(bookStringLength, headerStringLength);
+        int headerStringLength2 = BookStore.getFormattedHeaderStringWithQuantity().length();
+        int bookStringLength2 = BookStore.getFormattedBookString(book, 3).length();
+        assertEquals(bookStringLength2, headerStringLength2);
+    }
 }

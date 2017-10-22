@@ -149,7 +149,7 @@ public class BookStore implements BookList {
      *
      * @return legend string
      */
-    public static String getFormattedLegendStringWithQuantity() {
+    public static String getFormattedHeaderStringWithQuantity() {
         return getFormattedHeaderString() + String.format("%8s", "Qty");
     }
 

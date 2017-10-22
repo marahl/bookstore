@@ -173,6 +173,15 @@ public class BookStockTest {
         assertEquals(expected, actual2);
     }
 
+    @Test
+    public void getQuantityNotFound() throws Exception {
+        int actual1 = stock.getQuantity(new Book("", "", "0"));
+        int actual2 = stock.getQuantity(-1);
+        int expected = -1;
+        assertEquals(expected, actual1);
+        assertEquals(expected, actual2);
+    }
+
     private String createParseString(Book book, int quantity) {
         return String.format("%s;%s;%f;%d", book.getTitle(), book.getAuthor(), book.getPrice(), quantity);
     }
@@ -190,7 +199,7 @@ public class BookStockTest {
     }
 
     @Test
-    public void parseBatch() throws Exception {
+    public void parseAndAddBatch() throws Exception {
         stock = new BookStock();
         Book[] books = new Book[]{
                 new Book("ABC", "Me", "0"),
@@ -206,7 +215,9 @@ public class BookStockTest {
             parseString += createParseString(book, quantity) + "\n";
         }
 
-        stock.parseAndAddBatch(parseString);
+        boolean didSucceed = stock.parseAndAddBatch(parseString);
+        assertEquals(true, didSucceed);
+
         Book[] bookStock = stock.getStock();
         for (int i = 0; i < bookStock.length; i++) {
             Book actual = bookStock[i];
@@ -219,6 +230,17 @@ public class BookStockTest {
             int expectedQuantity = quantities[i];
             assertEquals(expectedQuantity, actualQuantity);
         }
+    }
+
+    @Test
+    public void parseAndAddBatchWrongFormatting() throws Exception {
+        int expectedBookCount = stock.getStock().length;
+        boolean didSucceed1 = stock.parseAndAddBatch(("hello;world;0;0\na;b;c;d"));
+        boolean didSucceed2 = stock.parseAndAddBatch(("hello;world;0;0\na;b;0"));
+        assertEquals(false, didSucceed1);
+        assertEquals(false, didSucceed2);
+        int bookCount = stock.getStock().length;
+        assertEquals(expectedBookCount, bookCount);
     }
 
 }
