@@ -1,24 +1,26 @@
 package marahl.bookstore;
 
-import javafx.util.Pair;
 import marahl.bookstore.books.Book;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.math.BigDecimal;
+import java.util.AbstractMap;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 
 public class BookCartTest {
 
-    private Pair<Book, Integer>[] testBooks = new Pair[]{
-            new Pair<>(new Book("Mastering åäö", "Average Swede", new BigDecimal(762.00)), 15),
-            new Pair<>(new Book("How To Spend Money", "Rich Bloke", new BigDecimal(1000000.00)), 1),
-            new Pair<>(new Book("Generic Title", "First Author", new BigDecimal(185.50)), 5),
-            new Pair<>(new Book("Generic Title", "Second Author", new BigDecimal(1748.00)), 3),
-            new Pair<>(new Book("Random Sales", "Cunning Bastard", new BigDecimal(999.00)), 20),
-            new Pair<>(new Book("Random Sales", "Cunning Bastard", new BigDecimal(499.00)), 3),
-            new Pair<>(new Book("Desired", "Rich Bloke", new BigDecimal(564.50)), 3)};
+    private static final Map.Entry<Book, Integer>[] testBooks = new Map.Entry[]{
+            newEntry(new Book("Mastering åäö", "Average Swede", new BigDecimal(762.00)), 15),
+            newEntry(new Book("How To Spend Money", "Rich Bloke", new BigDecimal(1000000.00)), 1),
+            newEntry(new Book("Generic Title", "First Author", new BigDecimal(185.50)), 5),
+            newEntry(new Book("Generic Title", "Second Author", new BigDecimal(1748.00)), 3),
+            newEntry(new Book("Random Sales", "Cunning Bastard", new BigDecimal(999.00)), 20),
+            newEntry(new Book("Random Sales", "Cunning Bastard", new BigDecimal(499.00)), 3),
+            newEntry(new Book("Desired", "Rich Bloke", new BigDecimal(564.50)), 3)};
+
     private BookCart cart = null;
 
     @Before
@@ -26,28 +28,9 @@ public class BookCartTest {
         cart = new BookCart();
     }
 
-    private BookStore setUpStore() {
-        BookStore store = new BookStore();
-        for (Pair<Book, Integer> testBook : testBooks) {
-            store.add(testBook.getKey(), testBook.getValue());
-        }
-        return store;
-    }
 
-    @Test
-    public void buyFromStore() throws Exception {
-        BigDecimal expectedTotalPrice = BigDecimal.ZERO;
-        for (int i = 0; i < testBooks.length && i < 4; i++) {
-            Book book = testBooks[i].getKey();
-            int quantity = testBooks[i].getValue();
-
-            cart.addToCart(book, quantity + 5);
-            expectedTotalPrice = expectedTotalPrice.add(book.getPrice().multiply(new BigDecimal(quantity)));
-        }
-        cart.addToCart(new Book("", "", "100000"), 3);
-        BookStore store = setUpStore();
-        BigDecimal actualTotalPrice = cart.buyFromStore(store);
-        assertEquals(expectedTotalPrice, actualTotalPrice);
+    private static Map.Entry<Book, Integer> newEntry(Book book, int i) {
+        return new AbstractMap.SimpleImmutableEntry<>(book, i);
     }
 
     @Test

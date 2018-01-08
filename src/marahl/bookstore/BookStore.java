@@ -1,38 +1,24 @@
 package marahl.bookstore;
 
-import javafx.util.Pair;
 import marahl.bookstore.books.Book;
-import marahl.bookstore.books.BookList;
 
 import java.math.BigDecimal;
 import java.util.*;
 
-public class BookStore implements BookList {
+public class BookStore implements marahl.bookstore.books.BookList {
     public static final int OK = 0;
     public static final int NOT_IN_STOCK = 1;
     public static final int DOES_NOT_EXIST = 2;
-    private static final int PARSE_INDEX_TITLE = 0;
-    private static final int PARSE_INDEX_AUTHOR = 1;
-    private static final int PARSE_INDEX_PRICE = 2;
-    private static final int PARSE_INDEX_QUANTITY = 3;
-    private static final int PARSE_INDEX_COUNT = 4;
 
     private Integer currentId = 0;
     private final Map<Integer, Book> stock = new HashMap<>();
     private final Map<Integer, Integer> bookQuantity = new HashMap<>();
     private final Map<Book, Integer> bookIds = new LinkedHashMap<>();
 
-    public BookStore() {
-    }
-
-    public BookStore(String initialStockString) {
-        parseAndAddBatch(initialStockString);
-    }
-
     /**
-     * Matches the search string agains the beginning of each book's title and author and returns
+     * Matches the search string against the beginning of each book's title and author and returns
      * an array of each book with a match in either.
-     * Ex. search string="Hell" will match the books "hello world" by "Someone" and "The Story of My Life" by "Hellen Keller"
+     * Ex. search string="Hell" will match the books "<b>hell</b>o world" by "Someone" and "The Story of My Life" by "<b>Hell</b>en Keller"
      *
      * @param searchString String to search from among books in stock. Not case sensitive.
      * @return Array of books matching the search string.
@@ -74,6 +60,7 @@ public class BookStore implements BookList {
             } else {
                 id = currentId++;
             }
+
             stock.put(id, newBook);
             bookQuantity.put(id, quantity);
             bookIds.put(newBook, id);
@@ -85,38 +72,65 @@ public class BookStore implements BookList {
      * Remove a book with the ID provided. All other books with keep their current IDs.
      *
      * @param bookId id of the book to remove
-     * @return the book that was removed and its quantity or null if nothing was removed
+     * @return an entry containing the book that was removed as key and its quantity as value or null and 0 if nothing was removed
      */
-    public Pair<Book, Integer> remove(int bookId) {
-        Pair<Book, Integer> removedPair = null;
+    public Map.Entry<Book, Integer> remove(int bookId) {
+        Map.Entry<Book, Integer> removedEntry = createNewEntry(null, 0);
         synchronized (stock) {
-            Book removedBook = stock.remove(bookId);
-            if (removedBook != null) {
+            Book book = stock.get(bookId);
+            if (book != null) {
+                stock.remove(bookId);
+                bookIds.remove(book);
                 Integer quantity = bookQuantity.remove(bookId);
-                removedPair = new Pair<>(removedBook, quantity);
-                bookIds.remove(removedBook);
+                removedEntry = createNewEntry(book, quantity);
             }
         }
-        return removedPair;
+        return removedEntry;
     }
 
     /**
      * Remove a book from the stock. All other books with keep their current IDs.
      *
      * @param book the book to remove
-     * @return the book that was removed and its quantity or null if nothing was removed
+     * @return an entry containing the book that was removed as key and its quantity as value or null and 0 if nothing was removed
      */
-    public Pair<Book, Integer> remove(Book book) {
-        Pair<Book, Integer> removedPair = null;
+    public Map.Entry<Book, Integer> remove(Book book) {
+        Map.Entry<Book, Integer> removedEntry = createNewEntry(null, 0);
         synchronized (stock) {
-            Integer removedBookId = bookIds.remove(book);
-            if (removedBookId != null) {
-                Integer quantity = bookQuantity.remove(removedBookId);
-                Book removedBook = stock.remove(removedBookId);
-                removedPair = new Pair<>(removedBook, quantity);
+            Integer bookId = bookIds.get(book);
+            if (bookId != null) {
+                stock.remove(bookId);
+                bookIds.remove(book);
+                Integer quantity = bookQuantity.remove(bookId);
+                removedEntry = createNewEntry(book, quantity);
             }
         }
-        return removedPair;
+        return removedEntry;
+    }
+
+
+    /**
+     * Reduces the quantity of a book from the stock. Won't remove more of the book than available.
+     *
+     * @param id  the id of the book to reduce
+     * @param qty the quantity of books to be removed, has to be greater than 0
+     * @return an entry containing the book that was removed as key and the quantity removed as value or null and 0 if nothing was removed
+     */
+    public Map.Entry<Book, Integer> reduceQuantity(int id, int qty) {
+        Map.Entry<Book, Integer> reducedEntry = createNewEntry(null, 0);
+        if (qty >= 0) {
+            synchronized (stock) {
+                Book book = getBook(id);
+                if (book != null) {
+                    Integer currentQuantity = bookQuantity.get(id);
+                    int newQuantity = Math.max(currentQuantity - qty, 0);
+                    int decreasedQuantity = currentQuantity - newQuantity;
+                    bookQuantity.put(id, newQuantity);
+                    reducedEntry = createNewEntry(book, decreasedQuantity);
+                }
+            }
+        }
+        return reducedEntry;
     }
 
     /**
@@ -159,7 +173,7 @@ public class BookStore implements BookList {
         if (quantity != null) {
             return quantity;
         }
-        return -1;
+        return 0;
     }
 
     /**
@@ -176,65 +190,7 @@ public class BookStore implements BookList {
                 return quantity;
             }
         }
-        return -1;
-    }
-
-    /**
-     * Parses the string and returns a bock and a quantity as a Pair
-     * The string should be written as four values separated by ';'
-     * The values are in order: title;author;price;quantity
-     *
-     * @param bookString string to be parsed
-     * @return a Pair containing the book and quantity
-     * @throws IndexOutOfBoundsException if the string contains to few arguments
-     * @throws NumberFormatException     if the price isn't a decimal number or quantity isn't an integer
-     */
-    public static Pair<Book, Integer> parseBook(String bookString) throws IndexOutOfBoundsException, NumberFormatException {
-        if (bookString.isEmpty()) return null;
-        String[] result = bookString.split(";");
-        String title = result[PARSE_INDEX_TITLE];
-        String author = result[PARSE_INDEX_AUTHOR];
-        String price = result[PARSE_INDEX_PRICE].replace(",", "");
-
-        int quanity = Integer.parseInt(result[PARSE_INDEX_QUANTITY]);
-        Book book = new Book(title, author, price);
-        return new Pair<>(book, quanity);
-    }
-
-    /**
-     * Parses the string and adds the books found to the stock
-     * Each row in the string should contain exactly one book
-     * Each book should be written as four values separated by ';'
-     * The values are in order: title;author;price;quantity
-     *
-     * @param stockString sting to be parsed
-     * @return false if something went wrong while parsing, otherwise true
-     */
-    public boolean parseAndAddBatch(String stockString) {
-        List<Book> books = new ArrayList<>();
-        List<Integer> bookQuantities = new ArrayList<>();
-        Scanner sc = new Scanner(stockString);
-        String line;
-        int lineNumber = 0;
-        while (sc.hasNextLine()) {
-            line = sc.nextLine();
-            lineNumber++;
-            if (line.isEmpty()) continue;
-            try {
-                Pair<Book, Integer> bookValues = parseBook(line);
-                if (bookValues != null) {
-                    books.add(bookValues.getKey());
-                    bookQuantities.add(bookValues.getValue());
-                }
-            } catch (IndexOutOfBoundsException | NumberFormatException e) {
-                System.out.println(String.format("Error while parsing on line %d: %s", lineNumber, line));
-                return false;
-            }
-        }
-        Book[] bookArr = books.toArray(new Book[books.size()]);
-        int[] qtyArr = bookQuantities.stream().mapToInt(Integer::new).toArray();
-        addBatch(bookArr, qtyArr);
-        return true;
+        return 0;
     }
 
     /**
@@ -254,15 +210,13 @@ public class BookStore implements BookList {
     public int[] buy(Book... books) {
         Map<Book, Integer> currentlyStockedBooks = new HashMap<>();
         for (Book book : books) {
-            if (!currentlyStockedBooks.containsKey(book)) {
-                currentlyStockedBooks.put(book, getQuantity(book));
-            }
+            currentlyStockedBooks.put(book, getQuantity(book));
         }
         int[] bookStatus = new int[books.length];
         for (int i = 0; i < books.length; i++) {
             Book book = books[i];
-            int quantity = currentlyStockedBooks.get(book);
-            if (quantity < 0) {
+            Integer quantity = currentlyStockedBooks.get(book);
+            if (quantity == null) {
                 bookStatus[i] = DOES_NOT_EXIST;
             } else if (quantity <= 0) {
                 bookStatus[i] = NOT_IN_STOCK;
@@ -278,15 +232,11 @@ public class BookStore implements BookList {
     /**
      * Adds multiple books and their quantities to the stock. Arrays have to be the same size.
      *
-     * @param books       books to be added
-     * @param quanitities quantities of the books to be added
+     * @param books books to be added
      */
-    public void addBatch(Book[] books, int[] quanitities) {
-        if (books.length != quanitities.length) {
-            throw new IllegalArgumentException("Both arrays need to have the same length");
-        }
-        for (int i = 0; i < books.length; i++) {
-            add(books[i], quanitities[i]);
+    public void addBatch(Map.Entry<Book, Integer>[] books) {
+        for (Map.Entry<Book, Integer> book : books) {
+            add(book.getKey(), book.getValue());
         }
     }
 
@@ -301,50 +251,39 @@ public class BookStore implements BookList {
     }
 
     /**
-     * Creates a string header to use with <code>getFormattedBookString(Book)</code>
-     * Title Author Price
+     * Sums up price of all book with an OK status
      *
-     * @return legend string
+     * @param books books to calculate the prices from
+     * @return the price of all books with the OK status
+     * @throws IllegalArgumentException if the arrays differ in size
      */
-    public static String getFormattedHeaderString() {
-        String title = "Title";
-        String author = "Author";
-        String price = "Price";
-        return String.format("%24s%24s%16s", title, author, price);
+    public BigDecimal getPrice(Book... books) {
+        return getPrice(books, buy(books));
     }
 
     /**
-     * Creates a string header to use with <code>getFormattedBookString(Book,int)</code>
-     * Title Author Price Quantity
+     * Sums up price of all book with an OK status
      *
-     * @return legend string
+     * @param books      books to calculate the prices from
+     * @param bookStatus status of books to be added
+     * @return the price of all books with the OK status
+     * @throws IllegalArgumentException if the arrays differ in size
      */
-    public static String getFormattedHeaderStringWithQuantity() {
-        return getFormattedHeaderString() + String.format("%8s", "Qty");
+    public BigDecimal getPrice(Book[] books, int[] bookStatus) {
+        if (books.length != bookStatus.length) {
+            throw new IllegalArgumentException(String.format("The array of books and the array of statuses differ in size (%d != %d)", books.length, bookStatus.length));
+        }
+        BigDecimal totalPrice = new BigDecimal(0);
+        for (int i = 0; i < books.length; i++) {
+            int status = bookStatus[i];
+            if (status == OK) {
+                totalPrice = totalPrice.add(books[i].getPrice());
+            }
+        }
+        return totalPrice;
     }
 
-    /**
-     * Creates a string of the content of the book object and formats it in columns
-     *
-     * @param book contents to be used
-     * @return content string
-     */
-    public static String getFormattedBookString(Book book) {
-        String title = book.getTitle();
-        String author = book.getAuthor();
-        BigDecimal price = book.getPrice();
-        return String.format("%24s%24s%16.2f", title, author, price);
+    private static Map.Entry<Book, Integer> createNewEntry(Book book, int quantity) {
+        return new AbstractMap.SimpleImmutableEntry<>(book, quantity);
     }
-
-    /**
-     * Creates a string of the content of the book object and formats it in columns
-     *
-     * @param book     contents to be used
-     * @param quantity quantity of the book
-     * @return content string
-     */
-    public static String getFormattedBookString(Book book, int quantity) {
-        return getFormattedBookString(book) + String.format("%8d", quantity);
-    }
-
 }

@@ -1,36 +1,38 @@
 package marahl.bookstore;
 
-import javafx.util.Pair;
 import marahl.bookstore.books.Book;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
+import java.util.*;
 
 import static org.junit.Assert.*;
 
 
 public class BookStoreTest {
 
-    private Pair<Book, Integer>[] testBooks = new Pair[]{
-            new Pair<>(new Book("Mastering åäö", "Average Swede", new BigDecimal(762.00)), 15),
-            new Pair<>(new Book("How To Spend Money", "Rich Bloke", new BigDecimal(1000000.00)), 1),
-            new Pair<>(new Book("Generic Title", "First Author", new BigDecimal(185.50)), 5),
-            new Pair<>(new Book("Generic Title", "Second Author", new BigDecimal(1748.00)), 3),
-            new Pair<>(new Book("Random Sales", "Cunning Bastard", new BigDecimal(999.00)), 20),
-            new Pair<>(new Book("Random Sales", "Cunning Bastard", new BigDecimal(499.00)), 3),
-            new Pair<>(new Book("Desired", "Rich Bloke", new BigDecimal(564.50)), 3)};
+    private static final Map.Entry<Book, Integer>[] testBooks = new Map.Entry[]{
+            newEntry(new Book("Mastering åäö", "Average Swede", new BigDecimal(762.00)), 15),
+            newEntry(new Book("How To Spend Money", "Rich Bloke", new BigDecimal(1000000.00)), 1),
+            newEntry(new Book("Generic Title", "First Author", new BigDecimal(185.50)), 5),
+            newEntry(new Book("Generic Title", "Second Author", new BigDecimal(1748.00)), 3),
+            newEntry(new Book("Random Sales", "Cunning Bastard", new BigDecimal(999.00)), 20),
+            newEntry(new Book("Random Sales", "Cunning Bastard", new BigDecimal(499.00)), 3),
+            newEntry(new Book("Desired", "Rich Bloke", new BigDecimal(564.50)), 3)};
     private BookStore store = null;
 
     @Before
     public void setUp() throws Exception {
         store = new BookStore();
-        for (Pair<Book, Integer> testBook : testBooks) {
+        for (Map.Entry<Book, Integer> testBook : testBooks) {
             store.add(testBook.getKey(), testBook.getValue());
         }
     }
 
+    private static Map.Entry<Book, Integer> newEntry(Book book, int i) {
+        return new AbstractMap.SimpleImmutableEntry<>(book, i);
+    }
 
     @Test
     public void add() throws Exception {
@@ -73,19 +75,14 @@ public class BookStoreTest {
     @Test
     public void addBatch() throws Exception {
         store = new BookStore();
-        Book[] books = new Book[testBooks.length];
-        int[] quantities = new int[testBooks.length];
-        for (int i = 0; i < books.length; i++) {
-            books[i] = testBooks[i].getKey();
-            quantities[i] = testBooks[i].getValue();
-        }
+        Map.Entry<Book, Integer>[] books = testBooks;
 
-        store.addBatch(books, quantities);
+        store.addBatch(books);
 
         Book[] actualBooks = store.getStock();
         for (int i = 0; i < actualBooks.length; i++) {
-            Book expectedBook = books[i];
-            int expectedQuantity = quantities[i];
+            Book expectedBook = books[i].getKey();
+            int expectedQuantity = books[i].getValue();
             Book actualBook = actualBooks[i];
             int actualQuantity = store.getQuantity(actualBook);
 
@@ -96,58 +93,140 @@ public class BookStoreTest {
 
     @Test
     public void addBatchToCurrent() throws Exception {
-        Book[] books = new Book[]{
-                new Book("ABC", "Me", "0"),
-                new Book("Hello World", "Someone", "1000"),
-                new Book("", "", "50.33"),
-                new Book("", "", "99.99")
+        Map.Entry<Book, Integer>[] books = new Map.Entry[]{
+                newEntry(new Book("ABC", "Me", "0"), 0),
+                newEntry(new Book("Hello World", "Someone", "1000"), 1),
+                newEntry(new Book("", "", "50.33"), 2),
+                newEntry(new Book("", "", "99.99"), 3)
         };
         int[] quantities = new int[]{0, 1, 2, 3};
 
         int expectedSize = store.getStock().length + books.length;
-        store.addBatch(books, quantities);
+        store.addBatch(books);
         int actualSize = store.getStock().length;
         assertEquals(expectedSize, actualSize);
     }
+
 
     @Test
     public void addBatchToCurrentSameBooks() throws Exception {
-        Book[] books = new Book[testBooks.length];
-        int[] quantities = new int[testBooks.length];
-        for (int i = 0; i < books.length; i++) {
-            books[i] = testBooks[i].getKey();
-            quantities[i] = testBooks[i].getValue();
-        }
+        Map.Entry<Book, Integer>[] books = testBooks;
 
         int expectedSize = store.getStock().length;
-        store.addBatch(books, quantities);
+        store.addBatch(books);
         int actualSize = store.getStock().length;
         assertEquals(expectedSize, actualSize);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void addBatchDifferentArraySize() throws Exception {
-        store = new BookStore();
-        Book[] books = new Book[1];
-        int[] quantities = new int[3];
-        store.addBatch(books, quantities);
     }
 
     @Test
     public void removeBookByID() throws Exception {
-        Book expectedBook = store.getBook(3);
-        Book removedBook = store.remove(3).getKey();
-        assertEquals(expectedBook, removedBook);
+        int idBefore = 3;
+        Book bookBefore = store.getBook(3);
+
+        final Book expectedBookRemoved = bookBefore;
+        final int expectedQuantityRemoved = store.getQuantity(bookBefore);
+        final Book expectedBookAfterRemoval = null;
+        final int expectedQuantityAfterRemoval = 0;
+
+        final Map.Entry<Book, Integer> removed = store.remove(idBefore);
+
+
+        Book actualBookRemoved = removed.getKey();
+        int actualQuantityRemoved = removed.getValue();
+        Book actualBookAfterRemoval = store.getBook(idBefore);
+        int actualQuantityAfterRemoval = store.getQuantity(idBefore);
+
+        assertEquals(expectedBookRemoved, actualBookRemoved);
+        assertEquals(expectedQuantityRemoved, actualQuantityRemoved);
+        assertEquals(expectedBookAfterRemoval, actualBookAfterRemoval);
+        assertEquals(expectedQuantityAfterRemoval, actualQuantityAfterRemoval);
         assertNull(store.getBook(3));
     }
 
     @Test
     public void removeBookByBook() throws Exception {
-        Book book = testBooks[3].getKey();
-        Book removedBook = store.remove(book).getKey();
-        assertEquals(book, removedBook);
-        assertEquals(-1, store.getBookID(book));
-        assertEquals(-1, store.getQuantity(book));
+        final int idBefore = 3;
+        final Book bookBefore = store.getBook(idBefore);
+
+        final Book expectedBookRemoved = bookBefore;
+        final int expectedQuantityRemoved = store.getQuantity(bookBefore);
+        final int expectedBookIdAfterRemoval = -1;
+        final int expectedQuantityAfterRemoval = 0;
+
+        final Map.Entry<Book, Integer> removed = store.remove(bookBefore);
+
+        final Book actualBookRemoved = removed.getKey();
+        final int actualQuantityRemoved = removed.getValue();
+        final int actualBookIdAfterRemoval = store.getBookID(actualBookRemoved);
+        final int actualQuantityAfterRemoval = store.getQuantity(idBefore);
+
+        assertEquals(expectedBookRemoved, actualBookRemoved);
+        assertEquals(expectedQuantityRemoved, actualQuantityRemoved);
+        assertEquals(expectedBookIdAfterRemoval, actualBookIdAfterRemoval);
+        assertEquals(expectedQuantityAfterRemoval, actualQuantityAfterRemoval);
+    }
+
+    @Test
+    public void reduceQuantityOfBook() throws Exception {
+        final int idBefore = 2;
+        final Book bookBefore = store.getBook(idBefore);
+        final int quantityBefore = store.getQuantity(idBefore);
+        final int quantityToDecreace = 3;
+
+        final Book expectedBookRemoved = bookBefore;
+        final int expectedQuantityRemoved = Math.max(0, quantityToDecreace);
+        final int expectedBookIdAfterRemoval = idBefore;
+        final int expectedQuantityAfterRemoval = Math.max(0, quantityBefore - quantityToDecreace);
+
+        final Map.Entry<Book, Integer> removed = store.reduceQuantity(idBefore, quantityToDecreace);
+
+        final Book actualBookRemoved = removed.getKey();
+        final int actualQuantityRemoved = removed.getValue();
+        final int actualBookIdAfterRemoval = store.getBookID(actualBookRemoved);
+        final int actualQuantityAfterRemoval = store.getQuantity(idBefore);
+
+        assertEquals(expectedBookRemoved, actualBookRemoved);
+        assertEquals(expectedQuantityRemoved, actualQuantityRemoved);
+        assertEquals(expectedBookIdAfterRemoval, actualBookIdAfterRemoval);
+        assertEquals(expectedQuantityAfterRemoval, actualQuantityAfterRemoval);
+    }
+
+    @Test
+    public void reduceQuantityOfBookMoreThanAvailable() throws Exception {
+        final int idBefore = 2;
+        final Book bookBefore = store.getBook(idBefore);
+        final int quantityBefore = store.getQuantity(idBefore);
+        final int quantityToDecreace = quantityBefore * 3;
+
+        final Book expectedBookRemoved = bookBefore;
+        final int expectedQuantityRemoved = quantityBefore;
+        final int expectedBookIdAfterRemoval = idBefore;
+        final int expectedQuantityAfterRemoval = 0;
+
+        final Map.Entry<Book, Integer> removed = store.reduceQuantity(idBefore, quantityToDecreace);
+
+        final Book actualBookRemoved = removed.getKey();
+        final int actualQuantityRemoved = removed.getValue();
+        final int actualBookIdAfterRemoval = store.getBookID(actualBookRemoved);
+        final int actualQuantityAfterRemoval = store.getQuantity(idBefore);
+
+        assertEquals(expectedBookRemoved, actualBookRemoved);
+        assertEquals(expectedQuantityRemoved, actualQuantityRemoved);
+        assertEquals(expectedBookIdAfterRemoval, actualBookIdAfterRemoval);
+        assertEquals(expectedQuantityAfterRemoval, actualQuantityAfterRemoval);
+    }
+
+    @Test
+    public void reduceQuantityOfBookByNegativeValue() throws Exception {
+        final Book expectedBook = null;
+        final int expectedQuantity = 0;
+
+        final Map.Entry<Book, Integer> removed = store.reduceQuantity(0, -1);
+
+        assertEquals(expectedBook, removed.getKey());
+        assertEquals(expectedQuantity, (int) removed.getValue());
+        assertEquals(-1, store.getBookID(expectedBook));
+        assertEquals(0, store.getQuantity(expectedBook));
     }
 
     @Test
@@ -197,100 +276,9 @@ public class BookStoreTest {
     public void getQuantityNotFound() throws Exception {
         int actual1 = store.getQuantity(new Book("", "", "0"));
         int actual2 = store.getQuantity(-1);
-        int expected = -1;
+        int expected = 0;
         assertEquals(expected, actual1);
         assertEquals(expected, actual2);
-    }
-
-    private String createParseString(Book book, int quantity) {
-        return String.format("%s;%s;%f;%d", book.getTitle(), book.getAuthor(), book.getPrice(), quantity);
-    }
-
-    @Test
-    public void parseBook() throws Exception {
-        Book expectedBook = new Book("Hello World", "", "100.03");
-        Integer expectedQuantity = 0;
-        String parseString = createParseString(expectedBook, expectedQuantity);
-        Pair<Book, Integer> actualValue = BookStore.parseBook(parseString);
-        assertBookEquals(expectedBook, actualValue.getKey());
-        assertEquals(expectedQuantity, actualValue.getValue());
-    }
-
-    @Test
-    public void constructorInitialStorage() {
-        Book[] books = new Book[testBooks.length];
-        int[] quantities = new int[testBooks.length];
-
-        for (int i = 0; i < testBooks.length; i++) {
-            Pair<Book, Integer> testBook = testBooks[i];
-            books[i] = testBook.getKey();
-            quantities[i] = testBook.getValue();
-        }
-
-        String parseString = "";
-        for (int i = 0; i < books.length; i++) {
-            Book book = books[i];
-            int quantity = quantities[i];
-            parseString += createParseString(book, quantity) + "\n";
-        }
-
-        BookStore newStore = new BookStore(parseString);
-
-        Book[] bookStock = newStore.getStock();
-        for (int i = 0; i < bookStock.length; i++) {
-            Book actual = bookStock[i];
-            Book expected = books[i];
-            assertBookEquals(expected, actual);
-
-            int actualQuantity = newStore.getQuantity(actual);
-            int expectedQuantity = quantities[i];
-            assertEquals(expectedQuantity, actualQuantity);
-        }
-    }
-
-    @Test
-    public void parseAndAddBatch() throws Exception {
-        Book[] books = new Book[testBooks.length];
-        int[] quantities = new int[testBooks.length];
-
-        for (int i = 0; i < testBooks.length; i++) {
-            Pair<Book, Integer> testBook = testBooks[i];
-            books[i] = testBook.getKey();
-            quantities[i] = testBook.getValue();
-        }
-
-        String parseString = "";
-        for (int i = 0; i < books.length; i++) {
-            Book book = books[i];
-            int quantity = quantities[i];
-            parseString += createParseString(book, quantity) + "\n";
-        }
-
-        BookStore newStore = new BookStore();
-        boolean didSucceed = newStore.parseAndAddBatch(parseString);
-        assertEquals(true, didSucceed);
-
-        Book[] bookStock = newStore.getStock();
-        for (int i = 0; i < bookStock.length; i++) {
-            Book actual = bookStock[i];
-            Book expected = books[i];
-            assertBookEquals(expected, actual);
-
-            int actualQuantity = newStore.getQuantity(actual);
-            int expectedQuantity = quantities[i];
-            assertEquals(expectedQuantity, actualQuantity);
-        }
-    }
-
-    @Test
-    public void parseAndAddBatchWrongFormatting() throws Exception {
-        int expectedBookCount = store.getStock().length;
-        boolean didSucceed1 = store.parseAndAddBatch(("hello;world;0;0\na;b;c;d"));
-        boolean didSucceed2 = store.parseAndAddBatch(("hello;world;0;0\na;b;0"));
-        assertEquals(false, didSucceed1);
-        assertEquals(false, didSucceed2);
-        int bookCount = store.getStock().length;
-        assertEquals(expectedBookCount, bookCount);
     }
 
 
@@ -311,28 +299,30 @@ public class BookStoreTest {
     public void buyOneOfEach() throws Exception {
         Book[] cart = store.getStock();
         Book removedBook = store.remove(4).getKey();
+        Book reducedBook = store.reduceQuantity(3, 100).getKey();
 
         int[] status = store.buy(cart);
         assertEquals(cart.length, status.length);
 
+        String expectedResult = "";
+        String actualResult = "";
         for (int i = 0; i < cart.length; i++) {
             Book book = cart[i];
-            int quantity = store.getQuantity(book);
-            int actual = status[i];
-            int expected = -1;
+            actualResult += status[i];
             if (book == removedBook) {
-                expected = BookStore.DOES_NOT_EXIST;
-            } else if (quantity <= 0) {
-                expected = BookStore.NOT_IN_STOCK;
-            } else if (quantity > 0) expected = BookStore.OK;
-
-            assertEquals(expected, actual);
+                expectedResult += BookStore.DOES_NOT_EXIST;
+            } else if (book == reducedBook) {
+                expectedResult += BookStore.NOT_IN_STOCK;
+            } else {
+                expectedResult += BookStore.OK;
+            }
         }
+        assertEquals(expectedResult, actualResult);
     }
 
     @Test
     public void buyMultiple() throws Exception {
-        Pair<Book, Integer> testBook = testBooks[3];
+        Map.Entry<Book, Integer> testBook = testBooks[3];
         Book book = testBook.getKey();
         int bookQuantity = testBook.getValue();
         int buyQuantity = 10;
@@ -342,12 +332,13 @@ public class BookStoreTest {
         int[] status = store.buy(cart);
         assertEquals(buyQuantity, status.length);
 
-        for (int i = 0; i < testBooks.length; i++) {
-            int expected = i < bookQuantity ? BookStore.OK : BookStore.NOT_IN_STOCK;
-            int actual = status[i];
-
-            assertEquals(expected, actual);
+        String expectedResult = "";
+        String actualResult = "";
+        for (int i = 0; i < cart.length; i++) {
+            expectedResult += i < bookQuantity ? BookStore.OK : BookStore.NOT_IN_STOCK;
+            actualResult += status[i];
         }
+        assertEquals(expectedResult, actualResult);
     }
 
     @Test
@@ -357,28 +348,22 @@ public class BookStoreTest {
     }
 
     @Test
-    public void getFormattedBookString() throws Exception {
-        Book book = testBooks[4].getKey();
-        int quantity = 6;
-        String expected = String.format("%24s%24s%16.2f%8d", book.getTitle(), book.getAuthor(), book.getPrice(), quantity);
-        String actual = BookStore.getFormattedBookString(book, quantity);
-        assertEquals(expected, actual);
+    public void buyFromStore() throws Exception {
+        BigDecimal expectedTotalPrice = BigDecimal.ZERO;
+        List<Book> bookList = new ArrayList<>();
+        for (int i = 0; i < testBooks.length && i < 4; i++) {
+            Book book = testBooks[i].getKey();
+            int quantity = testBooks[i].getValue();
+
+            for (int j = 0; j < quantity + 5; j++) {
+                bookList.add(book);
+            }
+            expectedTotalPrice = expectedTotalPrice.add(book.getPrice().multiply(new BigDecimal(quantity)));
+        }
+        bookList.add(new Book("", "", "100000"));
+
+        BigDecimal actualTotalPrice = store.getPrice(bookList.toArray(new Book[bookList.size()]));
+        assertEquals(expectedTotalPrice, actualTotalPrice);
     }
 
-    @Test
-    public void getFormattedHeaderString() {
-        Book book = testBooks[0].getKey();
-        int headerStringLength = BookStore.getFormattedHeaderString().length();
-        int bookStringLength = BookStore.getFormattedBookString(book).length();
-        assertEquals(bookStringLength, headerStringLength);
-        int headerStringLength2 = BookStore.getFormattedHeaderStringWithQuantity().length();
-        int bookStringLength2 = BookStore.getFormattedBookString(book, 3).length();
-        assertEquals(bookStringLength2, headerStringLength2);
-    }
-
-    private void assertBookEquals(Book expectedBook, Book actualBook) {
-        assertEquals(expectedBook.getTitle(), actualBook.getTitle());
-        assertEquals(expectedBook.getAuthor(), actualBook.getAuthor());
-        assertEquals(expectedBook.getPrice().doubleValue(), actualBook.getPrice().doubleValue(), .01);
-    }
 }
