@@ -8,7 +8,7 @@ out/
 *.iml
 *.ipr
 *.iws
-#.idea/
+.idea/
 
 #Gradle
 .gradletasknamecache
